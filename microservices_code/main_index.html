@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemistry Learning Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f5f5;
+            font-family: 'Arial', sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin-top: 30px;
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: white;
+            margin-bottom: 15px;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+        }
+        .user-message {
+            background-color: #dcf8c6;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        .bot-message {
+            background-color: #f1f0f0;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+        .upload-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .chat-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #4a4a4a;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .status {
+            margin-top: 10px;
+            font-style: italic;
+            color: #6c757d;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .spinner-border {
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chemistry Learning Assistant</h1>
+        
+        <div class="upload-section">
+            <h3>Upload Chemistry Textbook</h3>
+            <form id="upload-form" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="pdfFile" class="form-label">Select PDF File</label>
+                    <input class="form-control" type="file" id="pdfFile" accept=".pdf">
+                </div>
+                <button type="submit" class="btn btn-primary">Upload and Process</button>
+            </form>
+            <div id="upload-status" class="status"></div>
+            <div id="upload-loading" class="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Processing your textbook... This may take a minute.</span>
+            </div>
+        </div>
+        
+        <div class="chat-section">
+            <h3>Ask Chemistry Questions</h3>
+            <div class="chat-container" id="chat-container">
+                <div class="message bot-message">
+                    Hi there! I'm your Chemistry Learning Assistant. Upload a textbook and then ask me any chemistry questions!
+                </div>
+            </div>
+            <form id="question-form">
+                <div class="input-group mb-3">
+                    <input type="text" id="question-input" class="form-control" placeholder="Type your chemistry question here..." required>
+                    <button class="btn btn-primary" type="submit">Ask</button>
+                </div>
+            </form>
+            <div id="question-loading" class="loading">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Thinking about your question...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('upload-form');
+            const uploadStatus = document.getElementById('upload-status');
+            const uploadLoading = document.getElementById('upload-loading');
+            const questionForm = document.getElementById('question-form');
+            const questionInput = document.getElementById('question-input');
+            const chatContainer = document.getElementById('chat-container');
+            const questionLoading = document.getElementById('question-loading');
+            let pdfUploaded = false;
+            
+            // Handle file upload and initial question
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const fileInput = document.getElementById('pdfFile');
+                const file = fileInput.files[0];
+                
+                if (!file) {
+                    uploadStatus.textContent = 'Please select a PDF file.';
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('question', 'Tell me what this textbook is about');
+                
+                uploadStatus.textContent = '';
+                uploadLoading.style.display = 'block';
+                
+                fetch('/ask', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    uploadLoading.style.display = 'none';
+                    if (data.error) {
+                        uploadStatus.textContent = 'Error: ' + data.error;
+                    } else {
+                        uploadStatus.textContent = 'Textbook processed successfully!';
+                        pdfUploaded = true;
+                        
+                        // Add a message to the chat
+                        const message = document.createElement('div');
+                        message.className = 'message bot-message';
+                        message.textContent = "Great! I've processed your textbook. " + data.answer;
+                        chatContainer.appendChild(message);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                })
+                .catch(error => {
+                    uploadLoading.style.display = 'none';
+                    uploadStatus.textContent = 'Error: ' + error.message;
+                });
+            });
+            
+            // Handle asking questions
+            questionForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const question = questionInput.value.trim();
+                
+                if (!question) return;
+                
+                // Add user question to chat
+                const userMessage = document.createElement('div');
+                userMessage.className = 'message user-message';
+                userMessage.textContent = question;
+                chatContainer.appendChild(userMessage);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                // Clear input
+                questionInput.value = '';
+                
+                // Show loading indicator
+                questionLoading.style.display = 'block';
+                
+                // Check if we have a file and should include it
+                const fileInput = document.getElementById('pdfFile');
+                const file = fileInput.files[0];
+                
+                if (file && !pdfUploaded) {
+                    // Send both file and question
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('question', question);
+                    
+                    fetch('/ask', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(handleResponse)
+                    .catch(handleError);
+                } else {
+                    // Send only the question
+                    const formData = new FormData();
+                    formData.append('question', question);
+                    
+                    fetch('/ask', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(handleResponse)
+                    .catch(handleError);
+                }
+                
+                function handleResponse(response) {
+                    return response.json().then(data => {
+                        questionLoading.style.display = 'none';
+                        
+                        // Add bot response to chat
+                        const botMessage = document.createElement('div');
+                        botMessage.className = 'message bot-message';
+                        
+                        if (data.error) {
+                            botMessage.textContent = 'Error: ' + data.error;
+                        } else {
+                            botMessage.textContent = data.answer;
+                            if (!pdfUploaded) pdfUploaded = true;
+                        }
+                        
+                        chatContainer.appendChild(botMessage);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    });
+                }
+                
+                function handleError(error) {
+                    questionLoading.style.display = 'none';
+                    
+                    const botMessage = document.createElement('div');
+                    botMessage.className = 'message bot-message';
+                    botMessage.textContent = 'Sorry, there was an error processing your question: ' + error.message;
+                    
+                    chatContainer.appendChild(botMessage);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
